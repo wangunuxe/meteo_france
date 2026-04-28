@@ -1,194 +1,207 @@
 # 🌤️ France Weather Pipeline
 
-一个完整的数据工程入门项目，用真实天气数据跑通从 API 抓取到自动调度的完整 DE 链路。
+A end-to-end data engineering starter project that walks through the full DE lifecycle — from API ingestion to automated scheduling — using real weather data.
 
-## 项目概览
+## Overview
 
 ```
-Open-Meteo API（免费·无需注册）
+Open-Meteo API (free · no sign-up required)
         ↓
-extract.py（抓取巴黎/里昂/马赛天气数据）
+extract.py (fetch weather data for Paris / Lyon / Marseille)
         ↓
-transform.py（清洗·去重·衍生字段）
+transform.py (clean · deduplicate · derive new fields)
         ↓
-PostgreSQL raw_weather（原始数据层）
+PostgreSQL raw_weather (raw data layer)
         ↓
-PostgreSQL clean_weather（清洗数据层）
+PostgreSQL clean_weather (cleaned data layer)
         ↓
-Airflow DAG（每天 06:00 自动调度）
+Airflow DAG (automated daily schedule at 06:00)
         ↓
-Metabase / matplotlib（可视化）
+Metabase / matplotlib (visualization)
 ```
 
-## 技术栈
+## Tech Stack
 
-| 组件 | 用途 |
-|------|------|
-| Python 3.12 | 数据抓取与清洗脚本 |
-| PostgreSQL 15 | 数据存储（双层架构） |
-| Apache Airflow 2.9 | 任务调度与编排 |
-| Docker Compose | 本地环境一键启动 |
-| Open-Meteo API | 天气数据源（免费） |
+| Component | Purpose |
+|-----------|---------|
+| Python 3.12 | Data extraction and transformation scripts |
+| PostgreSQL 15 | Storage with a two-layer architecture |
+| Apache Airflow 2.9 | Workflow orchestration and scheduling |
+| Docker Compose | One-command local environment setup |
+| Open-Meteo API | Weather data source (free, no API key needed) |
 
-## 项目结构
+## Project Structure
 
 ```
 france-weather-pipeline/
-├── docker-compose.yml      # Airflow + PostgreSQL 全家桶
-├── .env                    # 环境变量（不提交到 Git）
+├── docker-compose.yml      # Airflow + PostgreSQL stack
+├── .env                    # Environment variables (do not commit)
 ├── dags/
-│   └── weather_dag.py      # Airflow DAG 定义
+│   └── weather_dag.py      # Airflow DAG definition
 ├── scripts/
-│   ├── extract.py          # Step 1：调用 Open-Meteo API
-│   ├── transform.py        # Step 2：数据清洗与分类
-│   └── load.py             # Step 3：写入 PostgreSQL
+│   ├── extract.py          # Step 1: call the Open-Meteo API
+│   ├── transform.py        # Step 2: clean and classify data
+│   └── load.py             # Step 3: write to PostgreSQL
 ├── sql/
-│   └── init.sql            # 建表语句（容器启动时自动执行）
+│   └── init.sql            # Table definitions (auto-runs on container start)
 └── viz/
-    └── plot_weather.py     # matplotlib 温度趋势可视化
+    └── plot_weather.py     # Temperature trend chart with matplotlib
 ```
 
-## 快速开始
+## Getting Started
 
-### 前置要求
+### Prerequisites
 
-- Docker（已安装并运行）
-- Python 3.10+（用于本地可视化）
+- Docker (installed and running)
+- Python 3.10+ (for local visualization only)
 
-### 1. 启动所有服务
+### 1. Start all services
 
 ```bash
-# 初始化 Airflow 数据库和管理员账号（只需运行一次）
+# Initialize the Airflow database and admin account (run once only)
 docker compose up airflow-init
 
-# 后台启动所有服务
+# Start all services in the background
 docker compose up -d
 
-# 确认服务状态
+# Verify all containers are running
 docker compose ps
 ```
 
-### 2. 访问 Airflow UI
+### 2. Open the Airflow UI
 
-打开浏览器访问 `http://localhost:8080`
+Visit `http://localhost:8080` in your browser.
 
-- 用户名：`airflow`
-- 密码：`airflow`
+- Username: `airflow`
+- Password: `airflow`
 
-### 3. 触发 DAG
+### 3. Trigger the DAG
 
-在 Airflow UI 中：
+In the Airflow UI:
 
-1. 找到 `france_weather_pipeline`
-2. 打开左侧开关（Unpause）
-3. 点击右侧 ▶ 按钮手动触发
+1. Locate `france_weather_pipeline`
+2. Toggle the switch on the left to unpause it
+3. Click the ▶ button to trigger a manual run
 
-### 4. 验证数据
+### 4. Verify the data
 
 ```bash
-# 连接业务数据库（密码：weather123）
+# Connect to the weather database (password: weather123)
 psql -h localhost -p 5433 -U weather -d weather
 
-# 查看清洗后数据
+-- Inspect the cleaned data
 SELECT city, date, temp_max_c, temp_min_c, weather_category
 FROM clean_weather
 ORDER BY date DESC, city;
 
-# 查看原始数据
+-- Inspect the raw data
 SELECT city, date, temp_max, fetched_at
 FROM raw_weather
 ORDER BY fetched_at DESC
 LIMIT 10;
 ```
 
-### 5. 本地可视化
+### 5. Visualize locally
 
 ```bash
 pip install psycopg2-binary pandas matplotlib
 python viz/plot_weather.py
 ```
 
-## 数据库设计
+## Database Design
 
-### raw_weather（原始层）
+### raw_weather (raw layer)
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | SERIAL | 主键 |
-| city | VARCHAR | 城市名 |
-| date | DATE | 日期 |
-| temp_max | FLOAT | 最高温度 |
-| temp_min | FLOAT | 最低温度 |
-| precip_mm | FLOAT | 降雨量 (mm) |
-| wind_max | FLOAT | 最大风速 (km/h) |
-| fetched_at | TIMESTAMP | 抓取时间 |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | SERIAL | Primary key |
+| city | VARCHAR | City name |
+| date | DATE | Observation date |
+| temp_max | FLOAT | Maximum temperature |
+| temp_min | FLOAT | Minimum temperature |
+| precip_mm | FLOAT | Precipitation (mm) |
+| wind_max | FLOAT | Maximum wind speed (km/h) |
+| fetched_at | TIMESTAMP | Time the record was fetched |
 
-> 原始层**只追加、不更新**，完整保留历史原始数据。
+> The raw layer is **append-only**. Records are never updated, preserving the full history of every ingestion run.
 
-### clean_weather（清洗层）
+### clean_weather (cleaned layer)
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| city | VARCHAR | 城市名（联合主键） |
-| date | DATE | 日期（联合主键） |
-| temp_max_c | FLOAT | 最高温度（已清洗） |
-| temp_min_c | FLOAT | 最低温度（已清洗） |
-| temp_range_c | FLOAT | 温差（衍生字段） |
-| precip_mm | FLOAT | 降雨量（NULL 替换为 0） |
-| wind_max_kmh | FLOAT | 最大风速 |
-| weather_category | VARCHAR | 天气分类（clear/drizzle/rainy/stormy） |
-| updated_at | TIMESTAMP | 最后更新时间 |
+| Column | Type | Description |
+|--------|------|-------------|
+| city | VARCHAR | City name (composite PK) |
+| date | DATE | Observation date (composite PK) |
+| temp_max_c | FLOAT | Cleaned maximum temperature |
+| temp_min_c | FLOAT | Cleaned minimum temperature |
+| temp_range_c | FLOAT | Daily temperature range (derived) |
+| precip_mm | FLOAT | Precipitation (NULL replaced with 0) |
+| wind_max_kmh | FLOAT | Maximum wind speed |
+| weather_category | VARCHAR | Category: clear / drizzle / rainy / stormy |
+| updated_at | TIMESTAMP | Last updated timestamp |
 
-> 清洗层使用 `UPSERT` **幂等写入**，重复调度不产生重复数据。
+> The cleaned layer uses `UPSERT` for **idempotent writes** — re-running the pipeline never creates duplicate rows.
 
-## DAG 说明
+## DAG Configuration
 
 ```
 extract → transform → load
 ```
 
-| 配置项 | 值 |
-|--------|-----|
-| 调度时间 | 每天 06:00（巴黎时间） |
-| 失败重试 | 最多 2 次，间隔 5 分钟 |
-| 回填历史 | 关闭（catchup=False） |
-| Task 间传值 | XCom |
+| Setting | Value |
+|---------|-------|
+| Schedule | Daily at 06:00 (Europe/Paris) |
+| Retries on failure | Up to 2, with a 5-minute delay |
+| Backfill | Disabled (`catchup=False`) |
+| Inter-task data passing | XCom |
 
-## 天气分类规则
+## Weather Classification Rules
 
-| 分类 | 条件 |
-|------|------|
-| `stormy` | 风速 > 60 km/h |
-| `rainy` | 降雨量 > 10 mm |
-| `drizzle` | 降雨量 > 0.5 mm |
-| `clear` | 其他 |
+| Category | Condition |
+|----------|-----------|
+| `stormy` | Wind speed > 60 km/h |
+| `rainy` | Precipitation > 10 mm |
+| `drizzle` | Precipitation > 0.5 mm |
+| `clear` | Everything else |
 
-## 停止与清理
+## Stopping and Cleanup
 
 ```bash
-# 停止所有容器（保留数据）
+# Stop all containers (data is preserved)
 docker compose down
 
-# 停止并删除所有数据（谨慎）
+# Stop and delete all data volumes (irreversible)
 docker compose down -v
 ```
 
-## 后续扩展方向
+## What You Learn From This Project
+
+| Concept | Where it appears |
+|---------|-----------------|
+| REST API ingestion | `extract.py` |
+| Data cleaning and validation | `transform.py` |
+| Two-layer data architecture (raw vs. clean) | `init.sql`, `load.py` |
+| Idempotent writes with UPSERT | `load.py` |
+| DAG authoring and task dependencies | `weather_dag.py` |
+| Inter-task communication | XCom in `weather_dag.py` |
+| Containerised orchestration | `docker-compose.yml` |
+| Downstream consumption | `viz/plot_weather.py` |
+
+## Roadmap
 
 ```
-当前项目（基础）
-      ↓
-接入 dbt（替换 transform.py，SQL 化清洗逻辑）
-      ↓
-迁移到云平台（AWS S3 + RDS / GCP BigQuery）
-      ↓
-加入数据质量检测（Great Expectations）
-      ↓
-综合项目（Reddit 评论情感分析管道）
+This project (foundations)
+        ↓
+Introduce dbt (replace transform.py with SQL models)
+        ↓
+Migrate to the cloud (AWS S3 + RDS  or  GCP BigQuery)
+        ↓
+Add data quality checks (Great Expectations / dbt tests)
+        ↓
+Capstone project (Reddit comment sentiment pipeline)
 ```
 
-## 数据源
+## Data Source
 
-天气数据来自 [Open-Meteo](https://open-meteo.com/) —— 完全免费，无需注册，无需 API Key。
+Weather data is provided by [Open-Meteo](https://open-meteo.com/) — completely free, no account or API key required.
 
-覆盖城市：巴黎（Paris）、里昂（Lyon）、马赛（Marseille）
+Cities covered: Paris · Lyon · Marseille
