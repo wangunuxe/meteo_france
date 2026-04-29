@@ -1,6 +1,6 @@
 import requests
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
 CITIES = {
     "Paris":     {"lat": 48.8566, "lon": 2.3522},
@@ -10,8 +10,8 @@ CITIES = {
 
 def fetch_weather(city_name: str, lat: float, lon: float) -> dict:
     """
-    调用 Open-Meteo API，抓最近7天的每日数据。
-    API 完全免费，无需注册，无需 API key。
+    Call the Open-Meteo API to fetch the last 7 days of daily weather data.
+    Completely free — no account or API key required.
     """
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
@@ -27,14 +27,21 @@ def fetch_weather(city_name: str, lat: float, lon: float) -> dict:
         "past_days":  7,
         "forecast_days": 1,
     }
+    # The Response class
     response = requests.get(url, params=params, timeout=10)
-    response.raise_for_status()  # 非200状态码直接抛异常，Airflow 会捕获并重试
-    return response.json()
+    response.raise_for_status()  # If the status code is not 200, raise a execption immdiately and Airflow will catch it and retry
+    return response.json() # Converts the raw response (just a string in format JSON) text into a python dictionary
 
 
 def extract_all_cities() -> list[dict]:
     """
-    抓所有城市，返回扁平化的记录列表，每行=一个城市某一天的数据。
+    extract_all_cities() loops through all three cities and calls fetch_weather() for each one, which returns a dictionary containing the raw API response. -> "raw" is the full dictionary, which contains several keys
+
+    raw["daily"] picks out the value associated with the key "daily" — which is the nested dictionary containing all the weather data. -> "daily = raw["daily"] " is also a dictionary
+
+    The API response is column-oriented — meaning all the dates are stored in one list, all the max temperatures in another list, and so on. However, a database expects row-oriented data — one complete record per day. So the function uses enumerate() to loop through the dates by index, and uses that index i to pick the matching value from each of the other lists, building one dictionary per day.
+
+    Each dictionary is then appended to the records list. After all three cities are processed, records contains 24 dictionaries in total (8 days * 3 cities), each representing one city's weather on one specific day
     """
     records = []
     for city_name, coords in CITIES.items():
@@ -49,13 +56,14 @@ def extract_all_cities() -> list[dict]:
                 "temp_min":    daily["temperature_2m_min"][i],
                 "precip_mm":   daily["precipitation_sum"][i],
                 "wind_max":    daily["windspeed_10m_max"][i],
-                "fetched_at":  datetime.utcnow().isoformat(),  # 记录抓取时间，方便排查重复
+                "fetched_at":  datetime.now(timezone.utc).isoformat(),  # Record fetch time to help identify duplicates
             })
 
-    print(f"✅ 抓取完成，共 {len(records)} 条记录")
+    print(f"✅ Extraction complete — {len(records)} records fetched.")
     return records
 
 
 if __name__ == "__main__":
     data = extract_all_cities()
-    print(json.dumps(data[:2], indent=2, ensure_ascii=False))  # 预览前两条
+    #json.dumps() converts the Python dictionary into JSON string
+    print(json.dumps(data[:2], indent=2, ensure_ascii=False))

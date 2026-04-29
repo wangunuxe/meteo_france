@@ -203,5 +203,5 @@ Capstone project (Reddit comment sentiment pipeline)
 ## Data Source
 
 Weather data is provided by [Open-Meteo](https://open-meteo.com/) — completely free, no account or API key required.
-
+Weather Forecast API : https://open-meteo.com/en/docs
 Cities covered: Paris · Lyon · Marseille
