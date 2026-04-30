@@ -2,6 +2,7 @@ import os
 import psycopg2
 from psycopg2.extras import execute_values
 
+#调用路径？？？
 DB_CONFIG = {
     "host":     os.getenv("WEATHER_DB_HOST", "weather-db"),
     "port":     int(os.getenv("WEATHER_DB_PORT", 5432)),
