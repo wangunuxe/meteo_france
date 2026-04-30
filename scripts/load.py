@@ -3,6 +3,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 #调用路径？？？
+# A dictionary containing all the information needed to connect to the database. Each value is read from an environment variable — if the variable is not set, it falls back to the default value on the right. The real values come from .env via docker-compose.yml.
 DB_CONFIG = {
     "host":     os.getenv("WEATHER_DB_HOST", "weather-db"),
     "port":     int(os.getenv("WEATHER_DB_PORT", 5432)),
@@ -13,18 +14,31 @@ DB_CONFIG = {
 
 
 def get_conn():
+    """
+    Helper function that opens and returns a database connection
+    """
     return psycopg2.connect(**DB_CONFIG)
 
 
 def load_raw(records: list[dict]):
-    """追加写入 raw 层，不做去重（raw 层职责是忠实记录原始数据）"""
+    """
+    writing to the raw layer: — no deduplication, as the raw layer's responsibility is to faithfully record the original data.
+    """
+    # If the exact same record already exists, skip it silently instead of raising an error. This makes the insert safe to run multiple times.
     sql = """
         INSERT INTO raw_weather (city, date, temp_max, temp_min, precip_mm, wind_max, fetched_at)
         VALUES %s
         ON CONFLICT (city, date, fetched_at) DO NOTHING
     """
+    # list of dict -> list of tuple
     rows = [(r["city"], r["date"], r["temp_max"], r["temp_min"],
              r["precip_mm"], r["wind_max"], r["fetched_at"]) for r in records]
+    
+    # rows = []
+    # for r in records:
+    #     row = (r["city"], r["date"], r["temp_max"], r["temp_min"],
+    #         r["precip_mm"], r["wind_max"], r["fetched_at"])
+    #     rows.append(row)
 
     with get_conn() as conn, conn.cursor() as cur:
         execute_values(cur, sql, rows)
